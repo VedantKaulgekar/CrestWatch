@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forecaster console | CrestWatch</title><link rel="stylesheet" href="style.css"></head>
+<body class="cs"><div class="top"><a href="index.html" class="brand" style="text-decoration:none;color:inherit">CrestWatch<small>Forecaster console</small></a><span class="tag">SYNTHETIC VERIFICATION CASE</span><span class="r">Guidance for forecasters, not a public warning</span></div>
+<div class="grid"><aside class="col"><h3>Event</h3><div class="kv" id="ev"></div><h3>Forecast lead</h3><input type="range" id="lead" min="0" step="1"><div class="kv"><span>Lead</span><span id="lv"></span></div>
+<h3>Layers</h3><label class="ck"><input type="checkbox" id="lm" checked>Member tracks</label><label class="ck"><input type="checkbox" id="lc" checked>Spread cone (90% of members)</label><label class="ck"><input type="checkbox" id="lt">Synthetic truth track</label><label class="ck"><input type="checkbox" id="lb" checked>Downscaling crop</label>
+<h3>Ensemble at this lead</h3><div class="kv" id="ens"></div><p class="note">No basemap in the offline build. Add a tile layer or shapefile overlay when deploying.</p></aside>
+<main class="mid"><svg class="map" id="map" viewBox="0 0 640 640"></svg></main>
+<aside class="col"><div class="tabs"><button data-t="h" class="on">5 km hazard</button><button data-t="e">Evaluation</button><button data-t="a">Alert output</button></div><div id="pane"></div></aside></div>
+<script src="data/results.js"></script><script src="data/land.js"></script><script src="console.js"></script></body></html>

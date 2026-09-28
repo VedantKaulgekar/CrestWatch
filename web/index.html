@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CrestWatch | Ensemble tracking and 5 km guidance</title><link rel="stylesheet" href="style.css"></head><body>
+<header class="bar"><div class="in"><div class="brand">CrestWatch<small>SIH 2026 · PS 26078</small></div><nav><a href="#method">Method</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a><a href="console.html">Forecaster console</a></nav></div></header>
+<main class="wrap"><div class="hero"><h1>Follow extreme weather through the whole ensemble, then downscale only where it matters.</h1>
+<p>A pipeline for forecasters at NCMRWF and IMD: it tracks anomalies in every ensemble member, generates 5 km scenario samples for flagged regions, and reports alerts as probabilities with their evidence.</p>
+<a class="btn" href="console.html">Open forecaster console</a> <a class="btn alt" href="#method">Read the method</a></div>
+<div class="strip"><b>Data status.</b> This build runs on a synthetic ensemble that follows the NEPS-G schema. It verifies the software, not the forecast skill. Every figure below is labelled accordingly and comes from <code>data/results.json</code>.</div>
+<section id="method"><h2>Method</h2><p class="lead">Three stages, each with a defined input, output and baseline to beat.</p><div class="cols">
+<div><div class="n">STAGE 1</div><h3>Ensemble tracking</h3><p>Extreme Forecast Index per grid point, per-member detection and association, aggregation into a track ensemble with strike probabilities and a spread cone.</p></div>
+<div><div class="n">STAGE 2</div><h3>Probabilistic 5 km downscaling</h3><p>Residual model on the flagged crop only. Draws N samples so the output is a distribution, not one sharp map. A residual diffusion model (JAX) is trained and included.</p></div>
+<div><div class="n">STAGE 3</div><h3>Graded alerts</h3><p>Exceedance probabilities become Low, Moderate and Severe zones with a core coordinate, served as GeoJSON, CAP 1.2 and a REST API.</p></div></div></section>
+<section id="evidence"><h2>Evidence in this build</h2><p class="lead">Measured on 30 independent synthetic cases (tracking) and 20 held-out synthetic fields (downscaling).</p><table id="ev"><tr><th>Measure</th><th class="n">Value</th><th>What it shows</th></tr></table></section>
+<section id="limits"><h2>Limits, stated up front</h2><ul class="pl"><li>No NCMRWF data was available. Results on real cyclones (Amphan, Fani, Yaas) and a heatwave are the next step, using leave-one-event-out evaluation.</li>
+<li>The graph neural network tracker is not built yet. Tracking uses a classical per-member detector, which is also the baseline the GNN must beat.</li>
+<li>The diffusion downscaler is written but was not run here; the numbers shown come from the lighter statistical downscaler.</li>
+<li>The synthetic ensemble is over-dispersed, so probabilities are under-confident in the reliability diagram. Real ensembles will differ.</li>
+<li>Alert thresholds are illustrative and must be replaced with IMD-defined values. Outputs are forecaster guidance, not public warnings.</li></ul></section></main>
+<footer><div class="wrap">CrestWatch · Smart India Hackathon 2026 · Problem statement 26078</div></footer>
+<script src="data/results.js"></script><script>
+const R=window.RESULTS,m=R.metrics,t=m.track,i=t.lead.indexOf(96),d=m.downscale;
+const rows=[["Track error at +96 h, ensemble mean",t.ens_mean_err[i]+" km","Control run alone: "+t.control_err[i]+" km"],
+["Spread-skill ratio at +96 h",t.ssr[i],"Above 1 means over-dispersed"],
+["Downscaling CRPS, 16 samples",d.crps.ensemble16.toFixed(2)+" km/h","Bicubic (deterministic): "+d.crps.bicubic.toFixed(2)],
+["Peak wind ratio, one sample",d.stochastic_sample.peak_ratio.toFixed(3),"Bicubic: "+d.bicubic.peak_ratio.toFixed(3)+" (1.0 = peak preserved)"],
+["Sampling time, 32 samples, one crop",m.timing.sample32_s+" s","Measured on one CPU core; a GPU host is expected to be far faster"]];
+document.getElementById("ev").insertAdjacentHTML("beforeend",rows.map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td>${r[2]}</td></tr>`).join(""));
+</script></body></html>

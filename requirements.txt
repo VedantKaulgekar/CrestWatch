@@ -1,0 +1,8 @@
+numpy
+scipy
+fastapi
+uvicorn
+xarray
+cfgrib
+# optional, for pipeline/downscale_diffusion.py
+torch
