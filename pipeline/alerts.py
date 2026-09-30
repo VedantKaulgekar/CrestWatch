@@ -13,11 +13,12 @@ def build_alert(samples, centre, lead_h, event="Cyclonic storm (synthetic case)"
             feats.append(dict(type="Feature", properties=dict(kind="zone", category=name, colour=colour, threshold_kmh=v, min_prob=0.5, area_km2=int(m.sum()*DX*DX)),
                               geometry=dict(type="Polygon", coordinates=[[ll(y0, x0), ll(y0, x1), ll(y1, x1), ll(y1, x0), ll(y0, x0)]])))
     if top is None: return dict(alert=dict(category="None", event=event), geojson=dict(type="FeatureCollection", features=[]), cap="")
-    name, colour, v, m = top; W = P[v]*m; ii, jj = np.mgrid[:N, :N]
-    ci, cj = (W*ii).sum()/W.sum(), (W*jj).sum()/W.sum(); core = ll(ci, cj)  # [lon, lat]
+    name, colour, v, m = top; ii, jj = np.mgrid[:N, :N]
+    ci, cj = np.unravel_index(np.argmax(np.where(m, P[v], -1)), P[v].shape)  # peak-probability cell in the flagged zone (robust to small-sample holes in a weighted centroid)
+    core = ll(ci, cj)  # [lon, lat]
     feats.insert(0, dict(type="Feature", properties=dict(kind="core", category=name), geometry=dict(type="Point", coordinates=core)))
     alert = dict(category=name, colour=colour, event=event, lead_h=int(lead_h), threshold_kmh=v, core=[core[1], core[0]],
-                 core_prob=round(float(P[v][int(round(ci)), int(round(cj))]), 3), n_samples=int(len(samples)),
+                 core_prob=round(float(P[v][ci, cj]), 3), n_samples=int(len(samples)),
                  guidance="Forecaster guidance from a synthetic verification run; not a public warning.")
     cap = (f'<?xml version="1.0" encoding="UTF-8"?>\n<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><identifier>CRW-SYN-{lead_h}</identifier>'
            f'<sender>crestwatch@example.invalid</sender><sent>2020-05-15T00:00:00+00:00</sent><status>Exercise</status><msgType>Alert</msgType><scope>Restricted</scope>\n'

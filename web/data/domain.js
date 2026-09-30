@@ -1,0 +1,1 @@
+window.DOMAIN={"north": 38.0, "west": 60.0, "south": 5.0, "east": 100.0};

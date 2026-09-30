@@ -1,5 +1,9 @@
-import numpy as np
-LAT0, LON0, RES, NY, NX = 8.0, 80.0, 0.25, 65, 65
+import numpy as np, sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+from config import DOMAIN, RES
+LAT0, LON0 = DOMAIN["south"], DOMAIN["west"]
+NY = int(round((DOMAIN["north"]-DOMAIN["south"])/RES))+1
+NX = int(round((DOMAIN["east"]-DOMAIN["west"])/RES))+1
 LATS = LAT0 + RES*np.arange(NY); LONS = LON0 + RES*np.arange(NX)
 LEADS = np.arange(0, 241, 12)  # hours
 def km(a, b):

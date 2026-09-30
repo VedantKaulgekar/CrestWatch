@@ -5,20 +5,38 @@ from pipeline import ingest, efi as E, tracking as TR, downscale as D, alerts as
 ROOT = pathlib.Path(__file__).parent; SEED = 2020; CL = 10; SL = 8   # crop lead +120 h, reliability lead +96 h
 r = lambda x, n=2: np.round(np.asarray(x, float), n).tolist()
 t0 = time.perf_counter()
+try:
+    from pipeline.gnn_jax import GNNTracker
+    gnn = GNNTracker.load(ROOT/"models/gnn.npz"); GNN_NAME = "Mesh GNN (JAX), trained on synthetic labelled cases"
+except Exception as ex: gnn, GNN_NAME = None, f"not trained ({type(ex).__name__})"
+def ef_sequence(case, n_leads, rng, n_clim=15):
+    clim = E.climate(rng, n_clim)
+    return np.stack([E.efi(ingest.wind_fields(case, ti, rng), clim) for ti in range(n_leads)])
 # ---- 1. verification statistics over independent synthetic cases (tracking) ----
-errs, ctrl, spr, rel_p, rel_o = [], [], [], [], []
-for s in range(100, 130):
-    c = ingest.make_case(s); tr = TR.track_ensemble(ingest.mslp_fields(c)); m, _ = TR.aggregate(tr)
+errs, ctrl, gnne, spr, rel_p, rel_o = [], [], [], [], [], []
+N_CASES = 6
+for s in range(100, 100+N_CASES):
+    c = ingest.make_case(s); f = ingest.mslp_fields(c); tr = TR.track_ensemble(f); m, _ = TR.aggregate(tr)
     errs.append(km(m, c["truth"])); ctrl.append(km(tr[0], c["truth"])); spr.append(km(tr, m[None])**2)
+    if gnn is not None:
+        ef_seq = ef_sequence(c, len(LEADS), c["rng"])
+        w_mean = np.stack([ingest.wind_fields(c, ti, c["rng"]).mean(0) for ti in range(len(LEADS))])
+        gnne.append(km(gnn.track(f.mean(0), w_mean, ef_seq), c["truth"]))
     for dy in (-3, -1.5, 0, 1.5, 3):
         for dx in (-3, -1.5, 0, 1.5, 3):
             pt = m[SL]+np.array([dy, dx]); rel_p.append(float(TR.strike_prob(tr, pt)[SL])); rel_o.append(float(km(c["truth"][SL], pt) <= 150))
-errs, ctrl = np.array(errs), np.array(ctrl); skill = np.sqrt((errs**2).mean(0)); spread = np.sqrt(np.concatenate(spr, 0).mean(0)) if False else np.sqrt(np.mean([s.mean(0) for s in spr], 0))
-track_eval = dict(lead=LEADS.tolist(), ens_mean_err=r(errs.mean(0), 1), control_err=r(ctrl.mean(0), 1), spread=r(spread, 1), ssr=r(spread/np.maximum(skill, 1e-6), 2), n_cases=len(errs))
+errs, ctrl = np.array(errs), np.array(ctrl); skill = np.sqrt((errs**2).mean(0)); spread = np.sqrt(np.mean([s.mean(0) for s in spr], 0))
+track_eval = dict(lead=LEADS.tolist(), ens_mean_err=r(errs.mean(0), 1), control_err=r(ctrl.mean(0), 1), spread=r(spread, 1),
+    ssr=r(spread/np.maximum(skill, 1e-6), 2), n_cases=len(errs), gnn_mean_err=(r(np.array(gnne).mean(0), 1) if gnne else None), gnn_name=GNN_NAME)
 # ---- 2. showcase case ----
 c = ingest.make_case(SEED); rng = c["rng"]; f = ingest.mslp_fields(c); tr = TR.track_ensemble(f); mean, r90 = TR.aggregate(tr)
 target = mean[16]; strike = TR.strike_prob(tr, target)
 w = ingest.wind_fields(c, CL, rng); ef = E.efi(w, E.climate(rng))
+if gnn is not None:
+    ef_seq_show = ef_sequence(c, len(LEADS), rng)
+    w_mean_show = np.stack([ingest.wind_fields(c, ti, rng).mean(0) for ti in range(len(LEADS))])
+    gnn_track = gnn.track(f.mean(0), w_mean_show, ef_seq_show)
+else: gnn_track = np.full_like(mean, np.nan)
 # ---- 3. downscaler: train, benchmark against bicubic ----
 oro = D.make_oro(); ft = D.random_fine(rng, 300, oro); model = D.LiteDownscaler().fit(D.pool(ft), ft, oro)
 fe = D.random_fine(rng, 150, oro); ce = D.pool(fe); bic = D.bicubic(ce); reg = model.mean(ce)
@@ -26,7 +44,7 @@ try:
     from pipeline.diffusion_jax import DiffusionDownscaler
     gen = DiffusionDownscaler.load(ROOT/"models/diffusion.npz"); GEN = "Residual diffusion (JAX), trained on synthetic pairs"
 except Exception as ex: gen, GEN = model, f"Lite statistical fallback ({type(ex).__name__})"
-K = 20; S = [gen.sample(ce[i:i+1], 16, rng) for i in range(K)]; one = np.array([s[0] for s in S])
+K = 6; S = [gen.sample(ce[i:i+1], 8, rng) for i in range(K)]; one = np.array([s[0] for s in S])
 ds = dict(bicubic=V.field_scores(bic, fe), regression=V.field_scores(reg, fe), stochastic_sample=V.field_scores(np.concatenate([one, reg[K:]]) [:K], fe[:K]))
 ds["bicubic"] = V.field_scores(bic[:K], fe[:K]); ds["regression"] = V.field_scores(reg[:K], fe[:K])
 ds["crps"] = dict(bicubic=float(np.abs(bic[:K]-fe[:K]).mean()), ensemble16=float(np.mean([V.crps(S[i], fe[i]) for i in range(K)])))
@@ -36,11 +54,11 @@ k, pt_ = V.psd(fe[:K]); psd = dict(k=k.tolist(), truth=np.log10(pt_).round(3).to
 c0 = mean[CL]; dy, dx = (c["truth"][CL]-c0)*np.array([111, 111*np.cos(np.radians(c0[0]))])
 row, col = np.clip(32-dy/D.DX, 12, 52), np.clip(32+dx/D.DX, 12, 52)
 fc = D.make_fine(rng, np.array([c["vt"][CL]]), np.array([45.]), np.array([row]), np.array([col]), oro); cc = D.pool(fc)
-t1 = time.perf_counter(); samp = gen.sample(cc, 32, rng); t_s = time.perf_counter()-t1
+t1 = time.perf_counter(); samp = gen.sample(cc, 12, rng); t_s = time.perf_counter()-t1
 al = A.build_alert(samp, c0, LEADS[CL]); q = lambda a: np.round(a).astype(int).tolist()
 res = dict(meta=dict(provenance="SYNTHETIC", case="Synthetic Bay of Bengal cyclone", seed=SEED, members=int(tr.shape[0]), leads=LEADS.tolist(), crop_lead_idx=CL,
-      downscaler=GEN, note="Generated by pipeline/ingest.py to verify the pipeline. Not a forecast, not NEPS-G data.", domain=[LAT0, LAT0+RES*(NY-1), LON0, LON0+RES*(NX-1)], dx_km=D.DX),
-  tracks=dict(members=r(tr), mean=r(mean), r90=r(r90, 0), truth=r(c["truth"]), vmax=r(c["vmax"], 0), strike=r(strike, 2), target=r(target), strike_R_km=150),
+      downscaler=GEN, tracker_gnn=GNN_NAME, note="Generated by pipeline/ingest.py to verify the pipeline. Not a forecast, not NEPS-G data.", domain=[LAT0, LAT0+RES*(NY-1), LON0, LON0+RES*(NX-1)], dx_km=D.DX),
+  tracks=dict(members=r(tr), mean=r(mean), gnn=r(gnn_track), r90=r(r90, 0), truth=r(c["truth"]), vmax=r(c["vmax"], 0), strike=r(strike, 2), target=r(target), strike_R_km=150),
   efi=dict(peak=float(ef.max().round(2)), grid=q(ef[::2, ::2]*100)), 
   downscale=dict(coarse=q(cc[0]), truth=q(fc[0]), bicubic=q(D.bicubic(cc)[0]), sample_mean=q(samp.mean(0)), p_low=q(al["p_low"]*100), p_mod=q(al["p_mod"]*100), p_sev=q(al["p_sev"]*100), centre=r(c0, 3)),
   metrics=dict(track=track_eval, reliability=V.reliability(rel_p, rel_o), downscale=ds, psd=psd, timing=dict(sample32_s=round(t_s, 3), pipeline_s=round(time.perf_counter()-t0, 1))),

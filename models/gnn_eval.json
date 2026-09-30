@@ -1,0 +1,8 @@
+{
+ "n_test": 15,
+ "gnn_mean_km": 67.50818019659496,
+ "gnn_median_km": 54.21652138307744,
+ "ensemble_mean_km": 65.12828270417091,
+ "ensemble_median_km": 55.586232007190326,
+ "gnn_miss_rate": 0.0
+}

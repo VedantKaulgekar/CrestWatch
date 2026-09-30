@@ -10,8 +10,8 @@
 <div><div class="n">STAGE 3</div><h3>Graded alerts</h3><p>Exceedance probabilities become Low, Moderate and Severe zones with a core coordinate, served as GeoJSON, CAP 1.2 and a REST API.</p></div></div></section>
 <section id="evidence"><h2>Evidence in this build</h2><p class="lead">Measured on 30 independent synthetic cases (tracking) and 20 held-out synthetic fields (downscaling).</p><table id="ev"><tr><th>Measure</th><th class="n">Value</th><th>What it shows</th></tr></table></section>
 <section id="limits"><h2>Limits, stated up front</h2><ul class="pl"><li>No NCMRWF data was available. Results on real cyclones (Amphan, Fani, Yaas) and a heatwave are the next step, using leave-one-event-out evaluation.</li>
-<li>The graph neural network tracker is not built yet. Tracking uses a classical per-member detector, which is also the baseline the GNN must beat.</li>
-<li>The diffusion downscaler is written but was not run here; the numbers shown come from the lighter statistical downscaler.</li>
+<li>The graph neural network tracker is trained (2,100 steps, on 30 synthetic cases). On 15 held-out cases it is roughly level with the classical ensemble tracker: 67.6 km mean error (54.7 km median) against 65.1 km (55.6 km median). It does not yet clearly beat the classical baseline; more training cases would likely help more than more training steps at this point.</li>
+<li>The diffusion downscaler is trained (3,800 steps, synthetic pairs, with a high-noise fine-tuning stage for extremes). It preserves peak wind well (ratio 1.00) and beats bicubic on CRPS (1.38 vs 1.77), on a toy 2x task.</li>
 <li>The synthetic ensemble is over-dispersed, so probabilities are under-confident in the reliability diagram. Real ensembles will differ.</li>
 <li>Alert thresholds are illustrative and must be replaced with IMD-defined values. Outputs are forecaster guidance, not public warnings.</li></ul></section></main>
 <footer><div class="wrap">CrestWatch · Smart India Hackathon 2026 · Problem statement 26078</div></footer>

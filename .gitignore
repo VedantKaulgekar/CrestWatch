@@ -11,6 +11,7 @@ venv/
 
 # Large raw data: keep out of git (NEPS-G, NCUM, ERA5, IBTrACS downloads)
 data/raw/
+data/cache/
 *.grib
 *.grib2
 *.nc
@@ -30,5 +31,5 @@ Thumbs.db
 # Node (only if you add a web build step)
 node_modules/
 
-# Kept on purpose so the site opens without a 18-minute run:
-#   models/diffusion.npz, data/results.json, web/data/results.js, web/data/land.js
+# Kept on purpose so the site opens without a multi-minute run:
+#   models/diffusion.npz, models/gnn.npz, models/gnn_eval.json, data/results.json, web/data/results.js, web/data/land.js, web/data/domain.js
